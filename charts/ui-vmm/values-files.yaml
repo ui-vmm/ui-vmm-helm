@@ -1,0 +1,103 @@
+apps-configmaps:
+  ui-vmm-config:
+    enabled: true
+    data:
+      _default: |
+        config.yaml: |
+          ---
+          listen: 0.0.0.0
+          port: 7500
+          pretty_print: true
+          aes_key: random string
+          disable_user_registration: false
+          disable_user_recovery: false
+          disable_user_password_change: false
+          disable_server_add: false
+          disable_ssh_key_add: false
+          disable_output_compression: false
+
+          eventstream:
+            auth_timeout: 10
+            ping_interval: 1
+
+          simplestream:
+            enabled: true
+            images_lifetime: 7
+            deletion_interval: 6
+
+          tls:
+            key: service.key
+            pub: service.pem
+
+          jwt:
+            key: private.key
+            pub: public.pem
+
+          db:
+            host: postgresql
+            port: 5432
+            name: postgres
+            user: postgres
+            pass: postgres
+
+          mail:
+            user: user@gmail.com
+            pass: pass
+            smtp: smtp.gmail.com
+            port: 587
+
+          providers:
+            map:
+              user:
+                - ldap
+
+            addr:
+              ldap: 127.0.0.1:50051
+              lxd: 127.0.0.1:50052
+
+apps-stateless:
+  ui-vmm:
+    containers:
+      main:
+        configFiles:
+          private.key:
+            mountPath: /etc/ui-vmm/jwt/private.key
+            content: |
+              -----BEGIN RSA PRIVATE KEY-----
+              ...
+              -----END RSA PRIVATE KEY-----
+
+          public.pem:
+            mountPath: /etc/ui-vmm/jwt/public.pem
+            content: |
+              -----BEGIN PUBLIC KEY-----
+              ...
+              -----END PUBLIC KEY-----
+
+          ca.key:
+            mountPath: /etc/ui-vmm/tls/ca.key
+            content: |
+              -----BEGIN RSA PRIVATE KEY-----
+              ...
+              -----END RSA PRIVATE KEY-----
+
+          ca.pem:
+            mountPath: /etc/ui-vmm/tls/ca.pem
+            content: |
+              -----BEGIN CERTIFICATE-----
+              ...
+              -----END CERTIFICATE-----
+
+          service.key:
+            mountPath: /etc/ui-vmm/tls/service.key
+            content: |
+              -----BEGIN RSA PRIVATE KEY-----
+              ...
+              -----END RSA PRIVATE KEY-----
+
+          service.pem:
+            mountPath: /etc/ui-vmm/tls/service.pem
+            content: |
+              -----BEGIN CERTIFICATE-----
+              ...
+              -----END CERTIFICATE-----

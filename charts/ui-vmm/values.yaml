@@ -1,0 +1,200 @@
+werf:
+  repo: ui-vmm/ui-vmm
+
+global:
+  env: ""
+  _includes:
+    default-commonEnvs:
+      db_host: postgresql
+      db_name: postgres
+      db_user: postgres
+      db_pass: postgres
+
+    default-volumes:
+      containers:
+        main:
+          volumeMounts: |
+            - name: config-yaml
+              mountPath: /etc/ui-vmm/config.yaml
+              subPath: config.yaml
+      volumes: |
+        - name: config-yaml
+          configMap:
+            name: ui-vmm-config
+
+    apps-stateful-defaultApp:
+      reloader: true
+      revisionHistoryLimit: 3
+      service:
+        enabled: true
+        headless: true
+        name: "{{ $.CurrentApp.name }}"
+
+    apps-stateless-defaultApp:
+      _include: ["default-volumes"]
+      revisionHistoryLimit: 3
+      containers:
+        main:
+          enabled: true
+      service:
+        enabled: true
+        name: "{{ $.CurrentApp.name }}"
+
+    apps-ingresses-defaultIngress:
+      class:
+        _default: "nginx"
+
+    apps-initContainers-wait-postgres:
+      wait-postgres:
+        enabled: true
+        image:
+          name: postgres
+          staticTag: alpine3.16
+        command: |
+          - sh
+          - -ec
+          - |
+            check_postgresql_availability() {
+              i=0
+              while [ $i -lt 5 ]; do
+                pg_isready || return 1
+                i=$((i+1))
+                sleep 1
+              done
+            }
+            until check_postgresql_availability; do
+              sleep 1
+            done
+        envVars:
+          PGUSER: '{{ include "fl.value" (list $ . $.CurrentApp._commonEnvs.db_user) }}'
+          PGPORT: '{{ include "fl.value" (list $ . $.CurrentApp._commonEnvs.db_port) }}'
+          PGHOST: '{{ include "fl.value" (list $ . $.CurrentApp._commonEnvs.db_host) }}'
+
+    apps-jobs-defaultJob:
+      backoffLimit:
+        _default: 0
+      restartPolicy: "Never"
+
+apps-stateful:
+  postgresql:
+    _include: ["apps-stateful-defaultApp"]
+    enabled: true
+    reloader: false
+    _commonEnvs:
+      _include: ["default-commonEnvs"]
+    _storage:
+      class_name: null
+      size_gb:
+        _default: "1"
+    replicas: 1
+    containers:
+      postgresql:
+        enabled: true
+        image:
+          name: uivmm/docker-pgq
+          staticTag: 3.4.2
+        envVars:
+          PGDATA: /data/pg_data
+          POSTGRES_PORT: 5432
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_DB: '{{ include "fl.value" (list $ . $.CurrentApp._commonEnvs.db_name) }}'
+          POSTGRES_USER: '{{ include "fl.value" (list $ . $.CurrentApp._commonEnvs.db_user) }}'
+          POSTGRES_PASSWORD: '{{ include "fl.value" (list $ . $.CurrentApp._commonEnvs.db_pass) }}'
+        ports: |
+          - name: postgresql
+            containerPort: 5432
+        lifecycle: |
+          preStop:
+            exec:
+              command: [ "gosu", "postgres", "pg_ctl", "-m", "fast", "-w", "stop" ]
+        livenessProbe: |
+          tcpSocket:
+            port: 5432
+          timeoutSeconds: 4
+          initialDelaySeconds: 100
+        readinessProbe: |
+          exec:
+            command: ["sh", "-ic", "psql -h 127.0.0.1 -U $POSTGRES_USER -q -d postgres -c 'SELECT 1'"]
+          timeoutSeconds: 3
+        volumeMounts: |
+          - name: pg-data
+            mountPath: /data
+    volumeClaimTemplates: |
+      - metadata:
+          name: pg-data
+        spec:
+          accessModes: [ "ReadWriteOnce" ]
+          resources:
+            requests:
+              storage: {{include "fl.value" (list $ . $.CurrentApp._storage.size_gb)}}Gi
+          volumeMode: Filesystem
+    service:
+      name: postgresql
+      enabled: true
+      ports: |
+        - name: postgresql
+          port: 5432
+      headless: true
+
+apps-stateless:
+  ui-vmm:
+    _include: ["apps-stateless-defaultApp"]
+    enabled: true
+    replicas: 3
+    initContainers:
+      _include: ["apps-initContainers-wait-postgres"]
+    _commonEnvs:
+      _include: ["default-commonEnvs"]
+    containers:
+      main:
+        imagePullPolicy: Always
+        image:
+          name: uivmm/ui-vmm
+          staticTag: 0.1
+        ports: |
+          - name: http
+            containerPort: 7500
+        livenessProbe: |
+          httpGet:
+            path: /v1/health.alive
+            port: 7500
+          timeoutSeconds: 5
+    service:
+      ports: |
+        - name: http
+          port: 7500
+
+apps-ingresses:
+  ui-vmm:
+    _include: ["apps-ingresses-defaultIngress"]
+    enabled: true
+    annotations: |
+      nginx.ingress.kubernetes.io/rewrite-target: /$1
+    host: "{{ $.Values.global.ci_url }}"
+    paths: |
+      - path: /api/(.*)$
+        pathType: Prefix
+        backend:
+          service:
+            name: ui-vmm
+            port:
+              number: 7500
+
+apps-jobs:
+  migration:
+    _include: ["default-volumes", "apps-jobs-defaultJob"]
+    enabled: true
+    initContainers:
+      _include: ["apps-initContainers-wait-postgres"]
+    _commonEnvs:
+      _include: ["default-commonEnvs"]
+      job: true
+    containers:
+      main:
+        enabled: true
+        imagePullPolicy: Always
+        image:
+          name: uivmm/ui-vmm
+          staticTag: 0.1
+        args: |
+          - -migration
