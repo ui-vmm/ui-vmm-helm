@@ -1,0 +1,6 @@
+dependencies:
+- name: helm-apps
+  repository: https://flant.github.io/helm-apps
+  version: 1.1.2
+digest: sha256:013765f048557ffa48fe5e2e784a01d387a18af11bbab3c10e780305751a8462
+generated: "2022-10-18T03:01:56.669658+04:00"
