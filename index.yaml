@@ -1,0 +1,27 @@
+apiVersion: v1
+entries:
+  ui-vmm:
+  - apiVersion: v2
+    created: "2022-10-18T00:10:39.315554511Z"
+    dependencies:
+    - name: helm-apps
+      repository: '@helm-apps'
+      version: 1.1.2
+    digest: 3e9fbef356c21818e735d9e36cc89ef11db8059a56fd3530a17c6fec9044586f
+    name: ui-vmm
+    urls:
+    - https://github.com/ui-vmm/ui-vmm-helm/releases/download/ui-vmm-1.0.0/ui-vmm-1.0.0.tgz
+    version: 1.0.0
+  ui-vmm-panel:
+  - apiVersion: v2
+    created: "2022-10-18T00:10:39.586265501Z"
+    dependencies:
+    - name: helm-apps
+      repository: '@helm-apps'
+      version: 1.1.2
+    digest: 345c1dbb4ba736eaff0bed143f538dbfdde3efa264457f88cc5025da60c13fea
+    name: ui-vmm-panel
+    urls:
+    - https://github.com/ui-vmm/ui-vmm-helm/releases/download/ui-vmm-panel-1.0.0/ui-vmm-panel-1.0.0.tgz
+    version: 1.0.0
+generated: "2022-10-18T00:10:39.586271901Z"
